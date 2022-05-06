@@ -1,0 +1,9 @@
+{
+    "type": "mysql",
+    "host": "74.120.173.228",
+    "port": 3306,
+    "username": "root",
+    "password": "123qwe",
+    "database": "utrader",
+    "entities": ["dist/**/*.entities{.ts,.js}"]
+}

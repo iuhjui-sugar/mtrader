@@ -1,0 +1,3 @@
+安装Jenkins服务,为自动构建自动发布做准备
+Hello World 自动发布成功
+
