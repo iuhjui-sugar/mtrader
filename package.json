@@ -43,13 +43,9 @@
     "rimraf": "^3.0.2",
     "rxjs": "^7.2.0",
     "socks-proxy-agent": "^6.2.0-beta.0",
-    "socksv5": "^0.0.6",
-    "ts-async-results": "^0.2.0-0",
     "ts-lib": "^0.0.5",
-    "ts-results": "^3.3.0",
-    "typeorm": "^0.3.0",
-    "undici": "^5.0.0",
-    "zod": "^3.14.4"
+    "typeorm": "^0.2.45",
+    "undici": "^5.0.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^8.0.0",

@@ -80,7 +80,7 @@ export class PositionService {
             contract : options.contract,
         }});
         // 如果系统仓位不存在自动构造一个
-        if (position ===  null){
+        if (position ===  undefined){
             position = new Position();
             position.userid = options.userid;
             position.contract = options.contract;
@@ -124,7 +124,7 @@ export class PositionService {
             contract : options.contract,
         }});
         // 如果仓位不存在抛出错误
-        if (position === null){
+        if (position === undefined){
             throw new Error("不存在的仓位!");
         }
         // 更新仓位杠杆与时间
