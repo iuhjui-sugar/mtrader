@@ -25,6 +25,7 @@ import { CreatePositionDTO } from "./position";
 import { ResolvePositionsDTO } from "./position";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
+import { Connection } from "typeorm";
 
 
 @Controller("/api/v1/arbitrage.module/GATEIO.module/")
@@ -48,6 +49,8 @@ export class GATEIO_Controller{
         private entrustService:EntrustService,
 
         private positionService:PositionService,
+
+        private connection:Connection,
     ){}
     @Get("/test")
     public async test(){
@@ -84,13 +87,41 @@ export class GATEIO_Controller{
     @Post("/create_position")
     @UsePipes(new ValidationPipe())
     public async createPosition(@Body() options:CreatePositionDTO){
-        return await this.positionService.createPosition(options);
+        const runner = this.connection.createQueryRunner();
+        await runner.connect();
+        await runner.startTransaction();
+        try {
+            const value = await this.positionService.createPosition(runner,options);
+            await runner.commitTransaction();
+            return value;
+        } 
+        catch (error:unknown) {
+            console.log(error);
+            throw error;
+        }
+        finally {
+            runner.release();
+        }
     }
 
     @Post("/resolve_positions")
     @UsePipes(new ValidationPipe())
     public async resolvePositions(@Body() options:ResolvePositionsDTO){
-        return await this.positionService.resolvePositions(options);
+        const runner = this.connection.createQueryRunner();
+        await runner.connect();
+        await runner.startTransaction();
+        try {
+            const value = await this.positionService.resolvePositions(runner,options);
+            await runner.commitTransaction();
+            return value;
+        } 
+        catch (error:unknown) {
+            console.log(error);
+            throw error;
+        }
+        finally {
+            runner.release();
+        }
     }
 
     @Post("/make_positive_entrust_order")

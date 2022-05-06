@@ -1,7 +1,5 @@
 import { Injectable } from "@nestjs/common";
 import { Position } from "./position.entities";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
 import { CreatePositionDTO  } from "./position.dtos";
 import { ResolvePositionsDTO } from "./position.dtos";
 import { EntrustOrder } from "./position.entities";
@@ -9,45 +7,37 @@ import { Transaction } from "./position.entities";
 import { nanoid } from "nanoid";
 import { UpdatePositionDTO } from "./position.dtos";
 import { ResolveEntrustsDTO } from "./position.dtos";
+import { QueryRunner } from "typeorm";
 
 @Injectable()
 export class PositionService {
 
-    constructor(
-        @InjectRepository(Position)
-        private positionRepository:Repository<Position>,
-
-        @InjectRepository(EntrustOrder)
-        private entrustRepository:Repository<EntrustOrder>,
-
-        @InjectRepository(Transaction)
-        private transactionRepository:Repository<Transaction>,
-    ){}
+    constructor(){}
 
     // 创建一个交易
-    public async createTransaction(entrust:EntrustOrder,txtype:"spot"|"futures"){
+    public async createTransaction(runner:QueryRunner,entrust:EntrustOrder,txtype:"spot"|"futures"){
         // 生成当前时间
         let nowtime = Math.floor(new Date().getTime()/1000);
         // 构造一个交易实体
-        let transaction = new Transaction();
-        transaction.tradeid = nanoid(32);
-        transaction.entrustid = entrust.entrustid;
-        transaction.orderid = "";
-        transaction.txtype = txtype;
-        transaction.price  = 0;
-        transaction.size = 0;
-        transaction.iterate = 0;
-        transaction.txstatus = "wait";
-        transaction.modified = nowtime;
-        transaction.created = nowtime;
+        let tx = new Transaction();
+        tx.tradeid = nanoid(32);
+        tx.entrustid = entrust.entrustid;
+        tx.orderid = "";
+        tx.txtype = txtype;
+        tx.price  = 0;
+        tx.size = 0;
+        tx.iterate = 0;
+        tx.txstatus = "wait";
+        tx.modified = nowtime;
+        tx.created = nowtime;
         // 保存交易实体
-        await this.transactionRepository.save(transaction);
+        await runner.manager.getRepository(Transaction).save(tx);
         // 结束流程
-        return transaction;
+        return tx;
     }
 
     // 创建一个委托
-    public async createEntrust(posotion:Position,direction:"increase"|"decrease",position_size:number){
+    public async createEntrust(runner:QueryRunner,posotion:Position,direction:"increase"|"decrease",position_size:number){
         // 生成当前时间
         let nowtime = Math.floor(new Date().getTime()/1000);
         // 构造一个委托实体
@@ -61,21 +51,21 @@ export class PositionService {
         entrust.modified = nowtime;
         entrust.created = nowtime;
         // 保存委托实体对象
-        await this.entrustRepository.save(entrust);
+        await runner.manager.getRepository(EntrustOrder).save(entrust);
         // 创建现货交易
-        await this.createTransaction(entrust,"spot");
+        await this.createTransaction(runner,entrust,"spot");
         // 创建合约交易
-        await this.createTransaction(entrust,"futures");
+        await this.createTransaction(runner,entrust,"futures");
         // 结束流程
         return entrust;
     }
 
     // 创建一个仓位
-    public async createPosition(options:CreatePositionDTO){
+    public async createPosition(runner:QueryRunner,options:CreatePositionDTO){
         // 生成当前时间
         let nowtime = Math.floor(new Date().getTime()/1000);
         // 获取系统仓位信息
-        let position = await this.positionRepository.findOne({where:{
+        let position = await runner.manager.getRepository(Position).findOne({where:{
             userid:options.userid,
             contract : options.contract,
         }});
@@ -94,7 +84,7 @@ export class PositionService {
             throw new Error("禁止重复建仓,合约张数不为0!");
         }
         // 重复建仓拦截(仓位存在未完成委托)
-        let is_exisis_wait_entrust =  await this.entrustRepository.count({where:{
+        let is_exisis_wait_entrust =  await runner.manager.getRepository(EntrustOrder).count({where:{
             userid:position.userid,
             contract : position.contract,
             status : "wait",
@@ -107,20 +97,20 @@ export class PositionService {
         position.modified = nowtime;
         position.created = nowtime;
         // 保存仓位实体
-        await this.positionRepository.save(position);
+        await runner.manager.getRepository(Position).save(position);
         // 创建加仓委托
-        const entrust = await this.createEntrust(position,"increase",options.position_size);
+        await this.createEntrust(runner,position,"increase",options.position_size);
         // 结束流程
         return position;
     }
 
     // 更新一个仓位
-    public async updatePosition(options:UpdatePositionDTO,direction:"increase"|"decrease"){
+    public async updatePosition(runner:QueryRunner,options:UpdatePositionDTO,direction:"increase"|"decrease"){
         // 生成当前时间
         let nowtime = Math.floor(new Date().getTime()/1000);
         // 获取系统仓位信息
-        let position = await this.positionRepository.findOne({where:{
-            userid:options.userid,
+        let position = await runner.manager.getRepository(Position).findOne({where:{
+            userid : options.userid,
             contract : options.contract,
         }});
         // 如果仓位不存在抛出错误
@@ -131,33 +121,33 @@ export class PositionService {
         position.leverage = options.leverage;
         position.modified = nowtime;
         // 保存仓位实体
-        await this.positionRepository.save(position);
+        await runner.manager.getRepository(Position).save(position);
         // 创建加仓委托
-        await this.createEntrust(position,direction,options.position_size);
+        await this.createEntrust(runner,position,direction,options.position_size);
         // 结束流程
         return position;
     }
 
     // 增加一个仓位
-    public async increasePosition(options:UpdatePositionDTO){
-        return await this.updatePosition(options,"increase");
+    public async increasePosition(runner:QueryRunner,options:UpdatePositionDTO){
+        return await this.updatePosition(runner,options,"increase");
     }
 
     // 减少一个仓位
-    public async decreasePosition(options:UpdatePositionDTO){
-        return await this.updatePosition(options,"decrease");
+    public async decreasePosition(runner:QueryRunner,options:UpdatePositionDTO){
+        return await this.updatePosition(runner,options,"decrease");
     }
 
     // 获取仓位列表
-    public async resolvePositions(options:ResolvePositionsDTO){
-        return await this.positionRepository.find({where:{
+    public async resolvePositions(runner:QueryRunner,options:ResolvePositionsDTO){
+        return await runner.manager.getRepository(Position).find({where:{
             userid : options.userid,
         }});
     }
 
     // 获取委托列表
-    public async resolveEntrusts(options:ResolveEntrustsDTO){
-        return await this.entrustRepository.find({where:{
+    public async resolveEntrusts(runner:QueryRunner,options:ResolveEntrustsDTO){
+        return await runner.manager.getRepository(EntrustOrder).find({where:{
             userid : options.userid,
             status : "wait",
         }});
