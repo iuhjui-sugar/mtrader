@@ -3,14 +3,14 @@ import { IsNotEmpty } from "class-validator";
 import { IsNumber } from "class-validator";
 import { IsInt } from "class-validator";
 
-export class ResolveEntrustsDTO {
+export class FindEntrustsDTO {
     // 用户编号
     @IsString()
     @IsNotEmpty()
     public userid:string = "";
 }
 
-export class ResolvePositionsDTO {
+export class FindPositionsDTO {
     // 用户编号
     @IsString()
     @IsNotEmpty()

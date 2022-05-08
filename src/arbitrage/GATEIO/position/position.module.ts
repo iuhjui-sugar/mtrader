@@ -1,20 +1,23 @@
 import { Module } from "@nestjs/common";
-import { PositionService } from "./position.service";
-import { TypeOrmModule } from "@nestjs/typeorm";
-import { Position } from "./position.entities";
-import { EntrustOrder } from "./position.entities";
-import { Transaction } from "./position.entities";
+import { PositionService } from "./services/position/position.service";
+import { StorageService } from "./services/storage/storage.service";
+import { BullModule } from "@nestjs/bull";
+import { MonitorService } from "./services/monitor/monitor.service";
 
 @Module({
     imports : [
-        TypeOrmModule.forFeature([
-            Position,
-            EntrustOrder,
-            Transaction,
-        ]),
+        BullModule.registerQueue({
+            name  : "supervisor",
+            redis : {
+                host : "74.120.173.228",
+                port : 5070,
+            },
+        }),
     ],
     providers : [
+        StorageService,
         PositionService,
+        MonitorService,
     ],
     exports : [
         PositionService,

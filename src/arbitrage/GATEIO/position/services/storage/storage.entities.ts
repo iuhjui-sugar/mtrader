@@ -29,7 +29,7 @@ export class Position {
 }
 
 @Entity({name:"arbitrage-module/GATEIO-module/entrust-order"})
-export class EntrustOrder {
+export class Entrust {
     // 委托单号
     @PrimaryColumn("varchar")
     public entrustid:string = "";
@@ -47,7 +47,7 @@ export class EntrustOrder {
     public position_size:number = 0;
     // 委托订单状态
     @Column("varchar")
-    public status:"ok"|"wait"|"abrot" = "wait";
+    public status:"ok"|"wait"|"abort" = "wait";
     // 更新时间
     @Column("int")
     public modified:number = 0;
@@ -55,7 +55,6 @@ export class EntrustOrder {
     @Column("int")
     public created:number = 0;
 }
-
 
 @Entity({name:"arbitrage-module/GATEIO-module/transaction"})
 export class Transaction {
@@ -90,6 +89,3 @@ export class Transaction {
     @Column("int")
     public created:number = 0;
 }
-
-
-

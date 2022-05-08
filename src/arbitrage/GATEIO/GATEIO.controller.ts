@@ -15,120 +15,88 @@ import { UnlinkEndpointError } from "./endpoint";
 import { ResolveTickersError } from "./ticker";
 import { ResolveBalancesError } from "./account";
 import { ResolveBalancesDTO } from "./account";
-import { SpotService } from "./accessor";
-import { FuturesService } from "./accessor";
-import { WalletService } from "./accessor";
-import { EntrustService } from "./entrust";
-import { MakePositiveEntrustOrderDTO } from "./entrust";
 import { PositionService } from "./position";
 import { CreatePositionDTO } from "./position";
-import { ResolvePositionsDTO } from "./position";
 import { InjectQueue } from "@nestjs/bull";
-import { Queue } from "bull";
 import { Connection } from "typeorm";
-
+import { ServiceRuntimeError } from "../../defines/errors";
+import { UpdatePositionDTO } from "./position";
+import { FindPositionsDTO } from "./position";
+import { FindEntrustsDTO } from "./position";
 
 @Controller("/api/v1/arbitrage.module/GATEIO.module/")
 export class GATEIO_Controller{
     constructor(
-        @InjectQueue("supervisor")
-        private supervisorQuene:Queue,
-
-        private futuresService:FuturesService,
-
-        private spotService:SpotService,
-
-        private walletService:WalletService,
-
         private endpointService:EndpointService,
 
         private tickerService:TickerService,
 
         private accountService:AccountService,
 
-        private entrustService:EntrustService,
-
         private positionService:PositionService,
 
         private connection:Connection,
     ){}
-    @Get("/test")
-    public async test(){
-        try {
-            const data = await this.supervisorQuene.add({
-                iterate : 0,
-                nowtime : Math.floor(new Date().getTime()/1000)
-            },{delay:3000});
-            return data;
-            /*
-            return await this.futuresService.getPosition("usdt","BTC_USDT",{
-                apikey : "5d9f7cd290b4c0fc2645556acd009ef6",
-                apisecret : "57daa6d20d7d649742aaf6d8d900242d253d9c0a44f92b65ce02237d5c7b5e96",
-            });
-            */
-            /*
-            return await this.spotService.listSpotAccounts({
-                apikey : "5d9f7cd290b4c0fc2645556acd009ef6",
-                apisecret : "57daa6d20d7d649742aaf6d8d900242d253d9c0a44f92b65ce02237d5c7b5e96", 
-            });
-            */
-            /*
-            return await this.walletService.getTradeFee({},{
-                apikey : "5d9f7cd290b4c0fc2645556acd009ef6",
-                apisecret : "57daa6d20d7d649742aaf6d8d900242d253d9c0a44f92b65ce02237d5c7b5e96",
-            });
-            */
-        }
-        catch(error:unknown){
-            console.log(error);
-        }
-    }
 
+    // 创建一个仓位
     @Post("/create_position")
     @UsePipes(new ValidationPipe())
     public async createPosition(@Body() options:CreatePositionDTO){
-        const runner = this.connection.createQueryRunner();
-        await runner.connect();
-        await runner.startTransaction();
-        try {
-            const value = await this.positionService.createPosition(runner,options);
-            await runner.commitTransaction();
-            return value;
-        } 
-        catch (error:unknown) {
-            console.log(error);
-            throw error;
-        }
-        finally {
-            runner.release();
-        }
+        return await this.safezone(async ()=>{
+            const entrust = await this.connection.transaction("SERIALIZABLE",async (database)=>{
+                return await this.positionService.createPosition(database,options);
+            });
+            await this.positionService.monitorEntrust(entrust);
+            return entrust;
+        });
     }
 
-    @Post("/resolve_positions")
+    // 增加一个仓位
+    @Post("/increase_position")
     @UsePipes(new ValidationPipe())
-    public async resolvePositions(@Body() options:ResolvePositionsDTO){
-        const runner = this.connection.createQueryRunner();
-        await runner.connect();
-        await runner.startTransaction();
-        try {
-            const value = await this.positionService.resolvePositions(runner,options);
-            await runner.commitTransaction();
-            return value;
-        } 
-        catch (error:unknown) {
-            console.log(error);
-            throw error;
-        }
-        finally {
-            runner.release();
-        }
+    public async increasePosition(@Body() options:UpdatePositionDTO){
+        return await this.safezone(async ()=>{
+            const entrust =  await this.connection.transaction("SERIALIZABLE",async (database)=>{
+                return await this.positionService.increasePosition(database,options);
+            });
+            await this.positionService.monitorEntrust(entrust);
+            return entrust;
+        });
     }
 
-    @Post("/make_positive_entrust_order")
+    // 减少一个仓位
+    @Post("/decrease_position")
     @UsePipes(new ValidationPipe())
-    public async makePositiveEntrustOrder(@Body() options:MakePositiveEntrustOrderDTO){
-        //return await this.entrustService.makePositiveEntrustOrder(options);
-        return {};
+    public async decreasePosition(@Body() options:UpdatePositionDTO){
+        return await this.safezone(async ()=>{
+            const entrust = await this.connection.transaction("SERIALIZABLE",async (database)=>{
+                return await this.positionService.decreasePosition(database,options);
+            });
+            await this.positionService.monitorEntrust(entrust);
+            return entrust;
+        });
+    }
+
+    // 获取仓位列表
+    @Post("/find_positions")
+    @UsePipes(new ValidationPipe())
+    public async findPositions(@Body() options:FindPositionsDTO){
+        return await this.safezone(async ()=>{
+            return await this.connection.transaction("READ COMMITTED",async (database)=>{
+                return await this.positionService.findPositions(database,options);
+            });
+        });
+    }
+
+    // 获取委托列表
+    @Post("/find_entrusts")
+    @UsePipes(new ValidationPipe())
+    public async findEntrusts(@Body() options:FindEntrustsDTO){
+        return await this.safezone(async ()=>{
+            return await this.connection.transaction("READ COMMITTED",async (database)=>{
+                return await this.positionService.findEntrusts(database,options);
+            });
+        });
     }
 
     @Post("/link_io_endpoint")
@@ -146,7 +114,7 @@ export class GATEIO_Controller{
             }
         };
     }
-    
+
     @Post("/unlink_io_endpoint")
     @UsePipes(new ValidationPipe())
     public async unlinkIoEndpoint(@Body() options:UnlinkIoEndpointDTO){
@@ -166,7 +134,7 @@ export class GATEIO_Controller{
     @Get("/resolve_tickers")
     public async resolveTickers(){
         try {
-            return await this.tickerService.resolveTickers();
+            return this.tickerService.resolveTickers();
         }
         catch(error:unknown){
             if (error instanceof ResolveTickersError){
@@ -189,6 +157,21 @@ export class GATEIO_Controller{
                 throw new BadRequestException(error.toReason());
             }
             else{
+                throw error;
+            }
+        }
+    }
+
+    // 安全区域
+    private async safezone<T>(fn:()=>Promise<T>){
+        try {
+            return await fn();   
+        } 
+        catch (error:unknown) {
+            if (error instanceof ServiceRuntimeError){
+                throw new BadRequestException(JSON.stringify(error.reasons));
+            }
+            else {
                 throw error;
             }
         }

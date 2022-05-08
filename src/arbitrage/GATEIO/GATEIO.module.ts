@@ -6,18 +6,9 @@ import { AccountModule } from "./account";
 import { PositionModule } from "./position";
 import { EntrustModule } from "./entrust";
 import { GATEIO_Controller } from "./GATEIO.controller";
-import { BullModule } from "@nestjs/bull";
-import { GATEIO_Processor } from "./GATEIO.processor";
 
 @Module({
     imports : [
-        BullModule.registerQueue({
-            name  : "supervisor",
-            redis : {
-                host : "74.120.173.228",
-                port : 5070,
-            },
-        }),
         AccessorModule,
         EndpointModule,
         TickerModule,
@@ -25,9 +16,7 @@ import { GATEIO_Processor } from "./GATEIO.processor";
         PositionModule,
         EntrustModule,
     ],
-    providers : [
-        GATEIO_Processor,
-    ],
+    providers : [],
     controllers : [
         GATEIO_Controller,
     ],
